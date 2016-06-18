@@ -1,7 +1,7 @@
 import numpy as np
 
 def project(x,pn,c):
-    x = x.T - c
+    x = x - c
     t = -np.dot(pn, x.T)
     return x + np.outer(t,pn) + c
 
@@ -16,9 +16,23 @@ class Base:
 
 class Empty(Base):
     def __init__(self): pass
-    def clip(self, x): return np.zeros_like(x[0], dtype=bool)
-    def clip_cylinder(self, x, pn): return np.zeros_like(x[0], dtype=bool)
-    
+    def clip(self, x): return np.zeros(x.shape[0], dtype=bool)
+    def clip_cylinder(self, x, pn): np.zeros(x.shape[0], dtype=bool)
+
+class All(Base):
+    def __init__(self): pass
+    def clip(self, x): return np.ones(x.shape[0], dtype=bool)
+    def clip_cylinder(self, x, pn): return np.ones(x.shape[0], dtype=bool)
+
+class PlaneSlice(Base):
+    def __init__(self, origin, normal):
+        self.c=np.array(origin)
+        self.n=np.array(normal)
+    def clip(self, x):
+        return np.dot((x-self.c), self.n)>=0
+    def clip_cylinder(self, x, pn):
+        return self.clip(x)
+
 class Rect(Base):
     def __init__(self, origin, axisA, axisB):
         self.origin = np.array(origin)
@@ -30,7 +44,7 @@ class Rect(Base):
         if np.linalg.det(mat) == 0: return Empty.clip_cylinder(self,x,pn)
         invmat = np.linalg.inv(mat)
 
-        uvt = np.dot(invmat, (x.T - self.origin).T)
+        uvt = np.dot(invmat, (x - self.origin).T)
         u,v = uvt[0],uvt[1]
         return np.all((0 <= u, u <= 1,
             0 <= v, v <= 1),
@@ -44,7 +58,7 @@ class Circle(Base):
     def clip(self, x):
         return Empty.clip(self, x)
     def clip_cylinder(self, x, pn):
-        x = x.T - self.c
+        x = x - self.c
         div = np.dot(self.n, pn.T)
         div = div if div != 0 else 0.001
         t = -np.dot(self.n, x.T) / div
@@ -66,7 +80,7 @@ class Box(Base):
             Rect(origin,size * xbasis,size * ybasis),
             Rect(origin + size * zbasis,size * xbasis,size * ybasis))
     def clip(self, x):
-        return np.all((self.bound[0] <= x.T, x.T <= self.bound[1]), axis=(0,2))
+        return np.all((self.bound[0] <= x, x <= self.bound[1]), axis=(0,2))
     def clip_cylinder(self, x, pn):
         return np.any([f.clip_cylinder(x,pn) for f in self.faces], axis=0)
 
@@ -80,10 +94,10 @@ class Sphere(Base):
         self.r = radius
 
     def clip(self, x):
-        return np.linalg.norm(x.T - self.c, axis=1) <= self.r
+        return np.linalg.norm(x - self.c, axis=1) <= self.r
 
     def clip_cylinder(self, x, pn):
-        return np.linalg.norm(np.cross(x.T - (pn + self.c),x.T - self.c), axis=1) <= self.r
+        return np.linalg.norm(np.cross(x - (pn + self.c),x - self.c), axis=1) <= self.r
 
 class Union(Base):
     def __init__(self, shapes):

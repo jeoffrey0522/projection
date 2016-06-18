@@ -87,6 +87,7 @@ ipch/
 *.vsp
 *.vspx
 *.sap
+*.pyperf
 
 # TFS 2012 Local Workspace
 $tf/
@@ -340,3 +341,4 @@ ENV/
 
 # Custom
 out/
+*.log
